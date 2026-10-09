@@ -1,0 +1,75 @@
+# The @argszero/dsh-empty-block-guard bundle patch: mount and go.
+#
+# One report (#9239) describes a session that can never be sent again: one
+# assistant message in its log carries a `reasoning` block whose text is empty,
+# the Messages serializer writes that block as
+#
+#   packages/llm/llm-deepseek/src/serialize.ts
+#     case 'reasoning': return {
+#       type: 'thinking', thinking: block.text,
+#       ...replay?.[index]?.signature === undefined ? {} : { signature: replay[index].signature },
+#     }
+#
+# and a strict Anthropic Messages-compatible gateway rejects the whole request
+# over `{"type":"thinking","thinking":""}`. Because the block is durable — it is
+# part of the session log, not of one request — every later turn rebuilds the
+# identical request and is refused at the same message index. The session is dead
+# from that message onward; only a new session escapes.
+#
+# The request side of the `llm/stream` waterfall cannot help. Its documentation is
+# explicit that a loop-built request arrives deep-frozen and is a pure function of
+# the session log — "listeners read it, never rewrite it" — so a log that already
+# contains the block cannot be filtered on its way out.
+#
+# What can be reached is the waterfall's **return value**:
+#
+#   packages/llm/llm/src/index.ts   the returned stream is a value a listener may
+#                                   replace (the request side of the same
+#                                   waterfall is a read-only observation)
+#   packages/core/agent-loop/src/agent.ts
+#                                   for await (const chunk of stream) — the loop
+#                                   consumes exactly that value, feeding one
+#                                   AssistantStreamAttempt that both assembles the
+#                                   durable assistant/message and records the raw
+#                                   chunks for replay
+#
+# So a block removed there is removed in the message and in the replay record at
+# once, and the two cannot disagree afterwards. The listener registers with
+# `prepend: true` because a waterfall's position is part of its meaning: the
+# removal has to be the last transformation before the consumer. `global: true` is
+# because the stream is dispatched with the registry instance as the listener's
+# `this`, so a mount scoped to a profile must still cover it.
+#
+# Removing a block is not enough on its own. The terminal chunk may carry a
+# `ReplayEnvelope` whose `blocks` array holds one adapter-private entry — for
+# `llm-deepseek`, the thinking signature — per emitted block, in first-seen stream
+# order, and the assembler discards the **whole envelope** when that count no
+# longer matches the emitted block count:
+#
+#   packages/llm/llm/src/assembler.ts
+#     if (envelope.blocks.length !== all.length) return { blocks, replay: undefined }
+#
+# Dropping a block without dropping its envelope entry would therefore trade a
+# loud 400 for a silent loss of every signature in that message — a worse failure,
+# because it is the quiet one. This plugin removes the entry at the dropped
+# block's own rank, exactly as core's own `kept` vector does, so the kept blocks
+# keep their signatures.
+#
+# This patch mounts the plugin and changes nothing else. `mode: 'drop'` (the
+# default) removes the empty block; `observe` decides and counts exactly as `drop`
+# would and emits the stream unchanged, which is how an operator measures whether
+# this is happening in their deployment before trusting the removal with it; `off`
+# installs no listener at all. `types` selects which of the two text-bearing block
+# types are guarded (both by default: `{type:'text',text:''}` is refused by the
+# same gateways for the same reason). Counters, the bounded history and the
+# plugin's own declared blind spots are served as `emptyBlockGuard.snapshot()`.
+#
+# The plugin has no runtime dependency: it subscribes to an event the harness
+# dispatches and wraps the stream it is handed, so it never imports a harness
+# package for value. That is deliberate — in a `profile` deployment a plugin's own
+# dependency can materialize a second copy of a harness package, a failure this
+# repository has already shipped more than once.
+
+- insert:
+    - id: empty-block-guard
+      name: '@argszero/dsh-empty-block-guard'

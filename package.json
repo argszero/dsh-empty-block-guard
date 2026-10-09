@@ -1,0 +1,78 @@
+{
+  "name": "@argszero/dsh-empty-block-guard",
+  "description": "Fixes a harness session that is refused by a strict Anthropic Messages-compatible gateway with \"message[N]: content[0]: thinking type must have non-empty thinking field\" / \"HTTP 400 INVALID_REQUEST\" - a refusal that repeats at the same message index on every later turn, because an assistant reasoning (or text) block whose text is empty is serialized to {\"type\":\"thinking\",\"thinking\":\"\"} and lives in the durable session log, so only a new session escapes. The request side of the llm/stream waterfall cannot help (a loop-built request arrives deep-frozen and is a pure function of the session log), so this plugin sits on the waterfall's RETURNED chunk stream - the one seam that reaches both what the loop assembles and what it records - and removes the empty block before either sees it. Dropping a block also drops its entry in the terminal replay envelope at the same rank, because BlockAssembler discards the whole envelope on a count mismatch and the naive fix would silently cost every thinking signature in that message. mode drop removes the block, observe counts the same decisions and changes nothing, off installs no listener. Zero runtime dependencies, fail-open, no sandbox changes.",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/argszero/dsh-empty-block-guard.git"
+  },
+  "homepage": "https://github.com/argszero/dsh-empty-block-guard#readme",
+  "bugs": {
+    "url": "https://github.com/argszero/dsh-empty-block-guard/issues"
+  },
+  "keywords": [
+    "cordis",
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "guard",
+    "llm",
+    "llm-stream",
+    "waterfall",
+    "reasoning",
+    "thinking",
+    "empty-block",
+    "replay-envelope",
+    "signature",
+    "session-poison",
+    "stream-guard"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-llm": ">=0.1.7-rc.2 <0.2.0 || >=0.2.0-rc.2 <0.2.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-llm": "^0.2.0-rc.2",
+    "@types/node": "^24.19.1",
+    "semver": "^7.8.5",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "pretest": "tsc",
+    "test": "node --test \"test/*.spec.mjs\"",
+    "test:inject": "node scripts/inject-defects.mjs",
+    "test:probe-lines": "node scripts/probe-lines.mjs",
+    "prepublishOnly": "tsc"
+  },
+  "engines": {
+    "node": "^22.19 || >=24"
+  }
+}
