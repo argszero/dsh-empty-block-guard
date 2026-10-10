@@ -133,7 +133,7 @@ suite measures both halves with the shipped assembler: the block is gone, and
 ## Install
 
 ```sh
-npm install @argszero/dsh-empty-block-guard@0.1.0
+npm install @argszero/dsh-empty-block-guard@0.1.1
 ```
 
 Then mount it. The package ships a bundle patch

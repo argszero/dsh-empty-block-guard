@@ -124,7 +124,11 @@ export async function world(spec = {}) {
       return ctx.waterfall(ctx.llm, 'llm/stream', options, () => streamOf(source))
     },
     async mount() {
-      harness.fork = await ctx.plugin(plugin, spec.config ?? {})
+      // `plugin` is this module's namespace; a loader entry mounts its **default**
+      // export (`exports.default ?? exports`), and the two differ by the `Config` key.
+      // `plugin: 'default'` mounts the object a profile entry actually reaches — see
+      // test/mount.spec.mjs for the defect that difference hides.
+      harness.fork = await ctx.plugin(spec.plugin === 'default' ? plugin.default : plugin, spec.config ?? {})
       return harness
     },
     async dispose() {

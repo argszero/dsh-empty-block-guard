@@ -1,7 +1,7 @@
 {
   "name": "@argszero/dsh-empty-block-guard",
   "description": "Fixes a harness session that is refused by a strict Anthropic Messages-compatible gateway with \"message[N]: content[0]: thinking type must have non-empty thinking field\" / \"HTTP 400 INVALID_REQUEST\" - a refusal that repeats at the same message index on every later turn, because an assistant reasoning (or text) block whose text is empty is serialized to {\"type\":\"thinking\",\"thinking\":\"\"} and lives in the durable session log, so only a new session escapes. The request side of the llm/stream waterfall cannot help (a loop-built request arrives deep-frozen and is a pure function of the session log), so this plugin sits on the waterfall's RETURNED chunk stream - the one seam that reaches both what the loop assembles and what it records - and removes the empty block before either sees it. Dropping a block also drops its entry in the terminal replay envelope at the same rank, because BlockAssembler discards the whole envelope on a count mismatch and the naive fix would silently cost every thinking signature in that message. mode drop removes the block, observe counts the same decisions and changes nothing, off installs no listener. Zero runtime dependencies, fail-open, no sandbox changes.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publishConfig": {
     "access": "public"
   },

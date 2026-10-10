@@ -230,9 +230,11 @@ const ENVELOPE_SENTENCE: Readonly<Record<EnvelopeOutcome, string>> = {
 /**
  * Mount the plugin.
  *
- * Both mount spellings are supported: `ctx.plugin(moduleNamespace)` has Cordis
- * fill the exported `Config` defaults, while `ctx.plugin({ name, inject, apply })`
- * passes `undefined` — so the default has to be here, not only in the export.
+ * `config` is whatever a loader entry passed, or `undefined` when it passed
+ * nothing, so the default lives here. It cannot live in an exported `Config`:
+ * Cordis reads `Config['~standard'].validate` off a plugin's `Config`, and a
+ * plain defaults object has no such property, so naming one there makes the mount
+ * throw before this function is called.
  * @param ctx - the plugin context.
  * @param config - the plugin configuration.
  */
@@ -358,4 +360,17 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.provide(SERVICE, service)
 }
 
-export default { name, inject, apply, Config: defaultConfig }
+/**
+ * The object a loader entry mounts: `vendor/loader` normalises a plugin module
+ * with `exports.default ?? exports` and hands this to `ctx.plugin`, which reads
+ * `Config['~standard'].validate` off it when it is present.
+ *
+ * `Config: defaultConfig` used to be exported here. `defaultConfig` is a plain
+ * object rather than a schema, so the lookup found no `~standard` and every mount
+ * of the installed package died with `TypeError: Cannot read properties of
+ * undefined (reading 'validate')` before `apply` ran. The defaults reach a mount
+ * through `apply(ctx, config = {})` instead, and the convention in this
+ * repository's own packages is a real schema (`export const Config = z.object(…)`)
+ * or no `Config` at all — never a plain object.
+ */
+export default { name, inject, apply }

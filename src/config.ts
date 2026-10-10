@@ -64,6 +64,12 @@ export interface Settings {
  * An **unrecognised** `mode` resolves to `observe` rather than to `drop`: the
  * failure mode of a typo has to be the one that changes nothing. That rule is
  * about the spelling, not about the absent value, which takes the default.
+
+ * Deliberately **not** exported as the plugin's `Config`: cordis validates a
+ * mounted plugin's `Config` through `Config['~standard'].validate`, and a plain
+ * defaults object has no `~standard`. The entry point exports
+ * `{ name, inject, apply }` with no `Config`, and these defaults arrive through
+ * `apply(ctx, config = {})`.
  */
 export const defaultConfig: Required<Config> = {
   mode: 'drop',
